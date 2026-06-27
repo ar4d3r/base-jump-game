@@ -3,185 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بازی پرش Base</title>
+    <title>دایناسور کروم روی شبکه Base</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         body {
-            font-family: Tahoma, sans-serif;
+            font-family: monospace;
             text-align: center;
-            background-color: #f0f2f5;
+            background-color: #f7f7f7;
             margin: 0;
             padding: 20px;
+            color: #333;
         }
         #game-container {
             position: relative;
             width: 600px;
-            height: 200px;
+            height: 150px;
             background-color: #fff;
-            border: 4px solid #0052FF; /* رنگ آبی شبکه Base */
+            border-bottom: 2px solid #535353;
             margin: 20px auto;
             overflow: hidden;
-            border-radius: 8px;
         }
+        /* ظاهر دایناسور پیکسلی */
         #dino {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background-color: #ff4a4a;
-            bottom: 0;
-            left: 50px;
-            border-radius: 4px;
-        }
-        #cactus {
             position: absolute;
             width: 20px;
             height: 40px;
-            background-color: #333;
+            background-color: #535353;
+            bottom: 0;
+            left: 40px;
+        }
+        /* ظاهر کاکتوس */
+        #cactus {
+            position: absolute;
+            width: 15px;
+            height: 35px;
+            background-color: #535353;
             bottom: 0;
             right: -20px;
         }
         .jump {
-            animation: jump-anim 0.5s linear;
+            animation: jump-anim 0.6s cubic-bezier(0.25, 1, 0.5, 1);
         }
         @keyframes jump-anim {
             0% { bottom: 0; }
-            50% { bottom: 100px; }
+            50% { bottom: 80px; }
             100% { bottom: 0; }
         }
-        button {
+        #status-box {
+            margin: 15px auto;
+            padding: 10px;
+            width: 580px;
+            background: #eef;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .btn-connect {
             background-color: #0052FF;
             color: white;
             border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 5px;
+            padding: 8px 15px;
             cursor: pointer;
-            margin: 10px;
+            font-weight: bold;
         }
-        button:disabled { background-color: #ccc; }
-        #score-board { font-size: 18px; font-weight: bold; margin: 10px; }
+        #score-board { font-size: 20px; font-weight: bold; margin-top: 10px; }
+        #tx-log { color: #0052FF; font-size: 12px; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-    <h1>بازی پرش بلاکچینی (Base)</h1>
+    <h1>T-Rex Base Runner 🦖</h1>
     
-    <button id="connect-btn">اتصال به کیف پول</button>
-    <p id="wallet-address">کیف پول متصل نیست</p>
+    <div id="status-box">
+        <button class="btn-connect" id="connect-btn">۱. اتصال کیف پول (Base Sepolia)</button>
+        <span id="wallet-address" style="margin-right:15px;">وضعیت: متصل نیست</span>
+    </div>
 
     <div id="game-container">
         <div id="dino"></div>
         <div id="cactus"></div>
     </div>
 
-    <div id="score-board">پرش‌های موفق این دور: <span id="current-score">0</span></div>
-    <button id="submit-btn" disabled>ثبت امتیاز در شبکه Base</button>
+    <div id="score-board">HI SCORE: <span id="current-score">0</span></div>
+    <div id="tx-log">وضعیت تراکنش‌های پرش: منتظر شروع...</div>
 
     <script>
-        // --- بخش بازی ---
-        const dino = document.getElementById("dino");
-        const cactus = document.getElementById("cactus");
-        const currentScoreIdx = document.getElementById("current-score");
+        // --- تنظیمات بلاکچین و قرارداد هوشمند ---
+        let provider, signer, userAddress, gameContract;
         
-        let score = 0;
-        let isJumping = false;
-        let gameInterval;
-        let cactusPosition = 600;
-
-        // پرش با دکمه Space
-        document.addEventListener("keydown", function(event) {
-            if (event.code === "Space" && !isJumping) {
-                isJumping = true;
-                dino.classList.add("jump");
-                setTimeout(() => {
-                    dino.classList.remove("jump");
-                    isJumping = false;
-                }, 500);
-            }
-        });
-
-        // منطق حرکت مانع و برخورد
-        function startGame() {
-            score = 0;
-            currentScoreIdx.innerText = score;
-            cactusPosition = 600;
-            
-            gameInterval = setInterval(() => {
-                cactusPosition -= 6;
-                if (cactusPosition < -20) {
-                    cactusPosition = 600;
-                    score++; // پرش موفقیت‌آمیز بود
-                    currentScoreIdx.innerText = score;
-                }
-                cactus.style.left = cactusPosition + "px";
-
-                // بررسی برخورد
-                let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
-                if (cactusPosition > 50 && cactusPosition < 90 && dinoBottom <= 40) {
-                    alert("باختی! امتیاز شما: " + score);
-                    clearInterval(gameInterval);
-                    document.getElementById("submit-btn").disabled = (score === 0 || !userAddress);
-                }
-            }, 20);
-        }
-
-        // شروع خودکار بازی
-        startGame();
-
-
-        // --- بخش Web3 و اتصال به Base ---
-        let provider;
-        let signer;
-        let userAddress = null;
-
-        // آدرس و ABI قرارداد هوشمندی که روی Base دیپلو می‌کنید
-        const contractAddress = "0xaf8FB38EC9f8301a401B4f18bb3dEdb3F029E54c"; // آدرس قرارداد خودت رو اینجا بذار
+        // آدرس قراردادی که روی ریمیکس ساختید را اینجا بگذارید
+        const contractAddress = "0xaf8FB38EC9f8301a401B4f18bb3dEdb3F029E54c"; 
         const contractABI = [
             "function recordJumps(uint256 _jumpCount) public"
         ];
 
-        const connectBtn = document.getElementById("connect-btn");
-        const submitBtn = document.getElementById("submit-btn");
-
-        connectBtn.addEventListener("click", async () => {
+        // اتصال به متامسک
+        document.getElementById("connect-btn").addEventListener("click", async () => {
             if (window.ethereum) {
                 try {
                     provider = new ethers.BrowserProvider(window.ethereum);
                     await provider.send("eth_requestAccounts", []);
                     signer = await provider.getSigner();
                     userAddress = await signer.getAddress();
+                    gameContract = new ethers.Contract(contractAddress, contractABI, signer);
                     
-                    document.getElementById("wallet-address").innerText = `متصل شد به: ${userAddress.substring(0,6)}...${userAddress.substring(38)}`;
-                    connectBtn.innerText = "متصل شد";
+                    document.getElementById("wallet-address").innerText = `متصل به: ${userAddress.substring(0,6)}...`;
+                    document.getElementById("connect-btn").innerText = "متصل شد ✅";
+                    startGame(); // شروع بازی بعد از اتصال موفقیت‌آمیز
                 } catch (err) {
-                    alert("اتصال به کیف پول لغو شد.");
+                    alert("خطا در اتصال به کیف پول.");
                 }
             } else {
-                alert("لطفاً متامسک یا یک کیف پول Web3 نصب کنید.");
+                alert("لطفاً متامسک را نصب کنید.");
             }
         });
 
-        submitBtn.addEventListener("click", async () => {
-            if (!signer) return alert("ابتدا کیف پول را متصل کنید.");
-            
-            submitBtn.innerText = "در حال ارسال تراکنش...";
-            submitBtn.disabled = true;
+        // --- بخش موتور بازی دایناسور ---
+        const dino = document.getElementById("dino");
+        const cactus = document.getElementById("cactus");
+        const currentScoreIdx = document.getElementById("current-score");
+        const txLog = document.getElementById("tx-log");
+        
+        let score = 0;
+        let isJumping = false;
+        let gameInterval;
+        let cactusPosition = 600;
+        let canScore = true; // برای اینکه هر مانع فقط یکبار امتیاز و تراکنش ثبت کند
 
+        // پریدن با کلید Space یا کلیک روی صفحه
+        document.addEventListener("keydown", function(event) {
+            if ((event.code === "Space" || event.type === "click") && !isJumping) {
+                isJumping = true;
+                dino.classList.add("jump");
+                setTimeout(() => {
+                    dino.classList.remove("jump");
+                    isJumping = false;
+                }, 600);
+            }
+        });
+
+        function startGame() {
+            if(!gameContract) {
+                txLog.innerText = "❌ ابتدا کیف پول را متصل کنید تا بازی شروع شود.";
+                return;
+            }
+            score = 0;
+            currentScoreIdx.innerText = score;
+            cactusPosition = 600;
+            canScore = true;
+            
+            clearInterval(gameInterval);
+            gameInterval = setInterval(() => {
+                cactusPosition -= 8; // سرعت حرکت مانع
+                if (cactusPosition < -20) {
+                    cactusPosition = 600;
+                    canScore = true; // مانع جدید آمد، آماده برای پرش بعدی
+                }
+                cactus.style.left = cactusPosition + "px";
+
+                // بررسی پرش موفق (وقتی مانع از دایناسور عبور میکند)
+                if (cactusPosition < 40 && canScore) {
+                    let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
+                    if (dinoBottom > 35) { // دایناسور بالا روی هواست و مانع رد شد
+                        score++;
+                        currentScoreIdx.innerText = score;
+                        canScore = false; // قفل کردن تا مانع بعدی
+                        
+                        // 🔥 ارسال تراکنش کاملاً خودکار روی شبکه Base به محض پرش موفق
+                        sendAutoTx();
+                    }
+                }
+
+                // بررسی برخورد و باختن
+                let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
+                if (cactusPosition > 30 && cactusPosition < 60 && dinoBottom <= 35) {
+                    txLog.innerText = "💥 برخورد انجام شد! بازی تمام شد. برای شروع دوباره صفحه را رفرش کنید.";
+                    clearInterval(gameInterval);
+                }
+            }, 20);
+        }
+
+        // تابع ارسال خودکار تراکنش در پس‌زمینه
+        async function sendAutoTx() {
+            if (!gameContract) return;
             try {
-                const contract = new ethers.Contract(contractAddress, contractABI, signer);
-                // ارسال تراکنش ثبت رکورد به شبکه Base
-                const tx = await contract.recordJumps(score);
-                alert("تراکنش فرستاده شد! منتظر تایید شبکه بمانید...");
-                await tx.wait();
-                alert("امتیاز شما با موفقیت روی زنجیره Base ثبت شد! 🎉");
-                startGame(); // بازی از اول شروع میشه
+                txLog.innerText = `⏳ پرش موفق! در حال ارسال تراکنش خودکار برای پرش شماره ${score}...`;
+                
+                // فراخوانی تابع قرارداد هوشمند با مقدار ۱ پرش
+                const tx = await gameContract.recordJumps(1);
+                
+                txLog.innerText = `🔗 تراکنش پرش ${score} فرستاده شد. هش: ${tx.hash.substring(0,10)}...`;
+                // صبر نمیکنیم تا بازی قفل نشود، تاییدیه در پس‌زمینه انجام می‌شود
+                tx.wait().then(() => {
+                    console.log(`تراکنش پرش ${score} روی Base تایید شد.`);
+                });
             } catch (error) {
                 console.error(error);
-                alert("خطا در ثبت تراکنش.");
-                submitBtn.disabled = false;
-                submitBtn.innerText = "ثبت امتیاز در شبکه Base";
+                txLog.innerText = `❌ تراکنش پرش شماره ${score} توسط کاربر لغو شد یا خطا داد.`;
             }
-        });
+        }
     </script>
 </body>
 </html>
