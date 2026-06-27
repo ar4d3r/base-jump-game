@@ -3,26 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>دایناسور کروم روی شبکه Base</title>
+    <title>دایناسور کروم روی فارکستر و Base</title>
+    
+    <meta property="fc:frame" content='{"version": "next", "imageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", "button": {"title": "شروع بازی دایناسور", "action": {"type": "launch_ctx"}}}' />
+
+    <script src="https://unpkg.com/@farcaster/frame-sdk/dist/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    
     <style>
         body {
             font-family: monospace;
             text-align: center;
             background-color: #f7f7f7;
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             color: #333;
         }
         #game-container {
             position: relative;
-            width: 600px;
+            width: 100%;
+            max-width: 600px;
             height: 150px;
             background-color: #fff;
             border-bottom: 2px solid #535353;
-            margin: 20px auto;
+            margin: 15px auto;
             overflow: hidden;
-            display: none; /* بازی تا قبل از اتصال ولت و زدن استارت مخفی است */
+            display: none; /* تا قبل از اتصال ولت و زدن استارت مخفی است */
         }
         #dino {
             position: absolute;
@@ -49,12 +55,12 @@
             100% { bottom: 0; }
         }
         #status-box {
-            margin: 15px auto;
-            padding: 20px;
-            width: 560px;
+            margin: 10px auto;
+            padding: 15px;
+            max-width: 560px;
             background: #eef;
             border-radius: 5px;
-            font-size: 16px;
+            font-size: 14px;
         }
         .btn-web3 {
             background-color: #0052FF;
@@ -67,16 +73,16 @@
             border-radius: 5px;
         }
         #start-btn {
-            background-color: #28a745; /* رنگ سبز برای دکمه استارت */
-            display: none; /* در ابتدا مخفی است */
+            background-color: #28a745;
+            display: none;
         }
-        #score-board { font-size: 20px; font-weight: bold; margin-top: 10px; display: none; }
-        #tx-log { color: #0052FF; font-size: 14px; margin-top: 10px; font-weight: bold; }
+        #score-board { font-size: 18px; font-weight: bold; margin-top: 10px; display: none; }
+        #tx-log { color: #0052FF; font-size: 13px; margin-top: 10px; font-weight: bold; padding: 0 10px; }
     </style>
 </head>
 <body>
 
-    <h1>T-Rex Base Runner 🦖</h1>
+    <h2>🦖 T-Rex Farcaster Base</h2>
     
     <div id="status-box">
         <p id="instruction-text">برای شروع، ابتدا باید کیف پول خود را متصل کنید.</p>
@@ -85,18 +91,18 @@
         <div id="wallet-address" style="margin-top: 10px; color: #666;">وضعیت: متصل نیست</div>
     </div>
 
-    <div id="game-container">
+    <div id="game-container" onclick="triggerJump()">
         <div id="dino"></div>
         <div id="cactus"></div>
     </div>
 
-    <div id="score-board">HI SCORE: <span id="current-score">0</span></div>
-    <div id="tx-log"></div>
+    <div id="score-board">SCORE: <span id="current-score">0</span></div>
+    <div id="tx-log">تاییدیه لود فریم...</div>
 
     <script>
         let provider, signer, userAddress, gameContract;
         
-        // آدرس قرارداد هوشمند خودت رو اینجا بذار
+        // 🛑 آدرس قرارداد هوشمند خودت که روی Base Sepolia دیپلوی کردی رو اینجا بذار
         const contractAddress = "0xaf8FB38EC9f8301a401B4f18bb3dEdb3F029E54c"; 
         const contractABI = ["function recordJumps(uint256 _jumpCount) public"];
 
@@ -117,46 +123,67 @@
         let canScore = true;
         let isGameRunning = false;
 
-        // ۱. دکمه اتصال به متامسک
-        connectBtn.addEventListener("click", async () => {
-            if (window.ethereum) {
+        // مطلع کردن فارکستر از لود شدن فریم
+        window.addEventListener("DOMContentLoaded", async () => {
+            if (window.farcaster && window.farcaster.FrameSDK) {
                 try {
-                    txLog.innerText = "لطفاً اتصال را در متامسک تایید کنید...";
-                    provider = new ethers.BrowserProvider(window.ethereum);
+                    await window.farcaster.FrameSDK.actions.ready();
+                    txLog.innerText = "فریم فارکستر با موفقیت آماده شد.";
+                } catch (e) {
+                    console.error("خطا در بهینه‌سازی SDK فارکستر:", e);
+                }
+            }
+        });
+
+        // ۱. اتصال به کیف پول (سازگار با متامسک و ولت داخلی فارکستر)
+        connectBtn.addEventListener("click", async () => {
+            // استفاده از ولت فارکستر در صورت وجود، در غیر این صورت متامسک معمولی
+            const ethereumProvider = window.farcaster?.Provider || window.ethereum;
+
+            if (ethereumProvider) {
+                try {
+                    txLog.innerText = "در حال ارتباط با کیف پول...";
+                    provider = new ethers.BrowserProvider(ethereumProvider);
                     await provider.send("eth_requestAccounts", []);
                     signer = await provider.getSigner();
                     userAddress = await signer.getAddress();
                     gameContract = new ethers.Contract(contractAddress, contractABI, signer);
                     
-                    document.getElementById("wallet-address").innerText = `متصل به: ${userAddress.substring(0,6)}...${userAddress.substring(38)}`;
+                    document.getElementById("wallet-address").innerText = `ولت متصل: ${userAddress.substring(0,6)}...${userAddress.substring(38)}`;
                     
-                    // تغییر دکمه‌ها پس از اتصال موفق
                     connectBtn.style.display = "none";
                     startBtn.style.display = "inline-block";
                     instructionText.innerText = "کیف پول متصل شد! هر زمان آماده بودید دکمه شروع را بزنید.";
-                    txLog.innerText = "";
+                    txLog.innerText = "آماده برای بازی.";
                 } catch (err) {
                     console.error(err);
                     txLog.innerText = "❌ خطا در اتصال به کیف پول.";
                 }
             } else {
-                alert("لطفاً افزونه متامسک را روی مرورگر خود نصب کنید.");
+                alert("کیف پولی یافت نشد. لطفاً این فریم را داخل Warpcast باز کنید.");
             }
         });
 
         // ۲. دکمه شروع بازی
         startBtn.addEventListener("click", () => {
-            document.getElementById("status-box").style.display = "none"; // مخفی کردن کامل باکس راهنما
-            gameContainer.style.display = "block"; // نمایش محیط بازی
-            scoreBoard.style.display = "block"; // نمایش امتیاز
-            txLog.innerText = "بازی شروع شد! با دکمه Space بپرید.";
+            document.getElementById("status-box").style.display = "none";
+            gameContainer.style.display = "block";
+            scoreBoard.style.display = "block";
+            txLog.innerText = "بازی شروع شد! روی باکس بازی ضربه بزنید یا Space بزنید تا بپرید.";
             isGameRunning = true;
             startGame();
         });
 
-        // کنترل پرش با دکمه Space
+        // دکمه کیبورد برای دسکتاپ
         document.addEventListener("keydown", function(event) {
-            if (event.code === "Space" && !isJumping && isGameRunning) {
+            if (event.code === "Space") {
+                triggerJump();
+            }
+        });
+
+        // تابع مدیریت پرش (هم لمسی هم کیبورد)
+        function triggerJump() {
+            if (!isJumping && isGameRunning) {
                 isJumping = true;
                 dino.classList.add("jump");
                 setTimeout(() => {
@@ -164,9 +191,9 @@
                     isJumping = false;
                 }, 600);
             }
-        });
+        }
 
-        // موتور اصلی بازی
+        // موتور اصلی حرکت دایناسور
         function startGame() {
             score = 0;
             currentScoreIdx.innerText = score;
@@ -176,7 +203,7 @@
             clearInterval(gameInterval);
             
             gameInterval = setInterval(() => {
-                cactusPosition -= 6; // سرعت حرکت مانع قرمز
+                cactusPosition -= 7; // سرعت حرکت مانع قرمز
                 
                 if (cactusPosition < -20) {
                     cactusPosition = 600; 
@@ -184,39 +211,39 @@
                 }
                 cactus.style.left = cactusPosition + "px";
 
-                // محاسبات عبور موفقیت‌آمیز
+                // بررسی عبور موفقیت‌آمیز
                 if (cactusPosition < 40 && canScore) {
                     let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
                     if (dinoBottom > 40) { 
                         score++;
                         currentScoreIdx.innerText = score;
                         canScore = false; 
-                        sendAutoTx(); // ارسال تراکنش خودکار
+                        sendAutoTx(); // ارسال تراکنش اتوماتیک روی زنجیره Base
                     }
                 }
 
-                // محاسبات برخورد (باختن)
+                // بررسی باختن (برخورد)
                 let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
                 if (cactusPosition > 30 && cactusPosition < 60 && dinoBottom <= 35) {
-                    txLog.innerText = "💥 برخورد انجام شد! بازی تمام شد. برای شروع دوباره صفحه را رفرش (F5) کنید.";
+                    txLog.innerText = "💥 بازی تمام شد! برای شروع دوباره، فریم را ببندید و دوباره باز کنید یا کست را رفرش کنید.";
                     isGameRunning = false;
                     clearInterval(gameInterval);
                 }
             }, 20);
         }
 
-        // ارسال تراکنش خودکار
+        // ارسال تراکنش خودکار روی شبکه Base
         async function sendAutoTx() {
             try {
-                txLog.innerText = `⏳ پرش موفقیت‌آمیز! درخواست تراکنش ${score} به متامسک فرستاده شد...`;
+                txLog.innerText = `⏳ پرش موفق! درخواست تراکنش پرش شماره ${score} به ولت فرستاده شد...`;
                 const tx = await gameContract.recordJumps(1);
-                txLog.innerText = `🔗 تراکنش پرش ${score} ارسال شد! در حال تایید در شبکه Base...`;
+                txLog.innerText = `🔗 تراکنش ${score} ارسال شد. در حال انتظار برای تایید بلاکچین Base...`;
                 
                 tx.wait().then(() => {
-                    txLog.innerText = `✅ تراکنش پرش ${score} با موفقیت در شبکه ثبت شد.`;
+                    txLog.innerText = `✅ پرش ${score} با موفقیت روی زنجیره Base ثبت شد!`;
                 });
             } catch (error) {
-                txLog.innerText = "❌ تراکنش توسط کاربر لغو شد یا شبکه خطا داد.";
+                txLog.innerText = "❌ تراکنش توسط کاربر رد شد یا مشکلی در شبکه لایه ۲ پیش آمد.";
             }
         }
     </script>
