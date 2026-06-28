@@ -3,249 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>دایناسور کروم روی فارکستر و Base</title>
+    <title>قیمت لحظه‌ای بیت‌کوین، اتریوم و طلا</title>
     
-    <meta property="fc:frame" content='{"version": "next", "imageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", "button": {"title": "شروع بازی دایناسور", "action": {"type": "launch_ctx"}}}' />
+    <meta property="fc:frame" content='{"version": "next", "imageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", "button": {"title": "مشاهده قیمت‌های زنده", "action": {"type": "launch_ctx"}}}' />
 
     <script src="https://unpkg.com/@farcaster/frame-sdk/dist/index.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     
     <style>
         body {
-            font-family: monospace;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             text-align: center;
-            background-color: #f7f7f7;
+            background-color: #0d0e12;
             margin: 0;
-            padding: 10px;
-            color: #333;
+            padding: 20px;
+            color: #fff;
         }
-        #game-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px;
-            height: 150px;
-            background-color: #fff;
-            border-bottom: 2px solid #535353;
-            margin: 15px auto;
-            overflow: hidden;
-            display: none; /* تا قبل از اتصال ولت و زدن استارت مخفی است */
+        
+        h2 {
+            font-size: 20px;
+            margin-bottom: 25px;
+            color: #a5a6f6;
+            letter-spacing: 0.5px;
         }
-        #dino {
-            position: absolute;
-            width: 20px;
-            height: 40px;
-            background-color: #535353;
-            bottom: 0;
-            left: 40px;
+
+        /* استایل کارت‌های قیمت */
+        .crypto-container {
+            max-width: 450px;
+            margin: 0 auto;
         }
-        #cactus {
-            position: absolute;
-            width: 15px;
-            height: 35px;
-            background-color: #ff4a4a;
-            bottom: 0;
-            left: 600px;
+
+        .price-card {
+            background: linear-gradient(135deg, #1e1f29 0%, #14151d 100%);
+            border: 1px solid #2a2b3d;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
         }
-        .jump {
-            animation: jump-anim 0.6s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-        @keyframes jump-anim {
-            0% { bottom: 0; }
-            50% { bottom: 90px; }
-            100% { bottom: 0; }
-        }
-        #status-box {
-            margin: 10px auto;
-            padding: 15px;
-            max-width: 560px;
-            background: #eef;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        .btn-web3 {
-            background-color: #0052FF;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            cursor: pointer;
-            font-weight: bold;
+
+        .asset-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             font-size: 16px;
-            border-radius: 5px;
+            font-weight: bold;
         }
-        #start-btn {
-            background-color: #28a745;
-            display: none;
+
+        .asset-icon {
+            font-size: 24px;
         }
-        #score-board { font-size: 18px; font-weight: bold; margin-top: 10px; display: none; }
-        #tx-log { color: #0052FF; font-size: 13px; margin-top: 10px; font-weight: bold; padding: 0 10px; }
+
+        .asset-name {
+            color: #fff;
+        }
+
+        .asset-symbol {
+            color: #626484;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        .price-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #00ffcc;
+            font-family: monospace;
+        }
+
+        #status-bar {
+            font-size: 11px;
+            color: #525474;
+            margin-top: 25px;
+        }
     </style>
 </head>
 <body>
 
-    <h2>🦖 T-Rex Farcaster Base</h2>
+    <h2>📊 داشبورد قیمت‌های زنده</h2>
     
-    <div id="status-box">
-        <p id="instruction-text">برای شروع، ابتدا باید کیف پول خود را متصل کنید.</p>
-        <button class="btn-web3" id="connect-btn">اتصال کیف پول</button>
-        <button class="btn-web3" id="start-btn">شروع بازی 🏁</button>
-        <div id="wallet-address" style="margin-top: 10px; color: #666;">وضعیت: متصل نیست</div>
-    </div>
+    <div class="crypto-container">
+        <div class="price-card">
+            <div class="asset-info">
+                <span class="asset-icon">🪙</span>
+                <div>
+                    <span class="asset-name">بیت‌کوین</span>
+                    <span class="asset-symbol">BTC</span>
+                </div>
+            </div>
+            <div class="price-value" id="btc-price">در حال دریافت...</div>
+        </div>
 
-    <div id="game-container" onclick="triggerJump()">
-        <div id="dino"></div>
-        <div id="cactus"></div>
-    </div>
+        <div class="price-card">
+            <div class="asset-info">
+                <span class="asset-icon">⛓️</span>
+                <div>
+                    <span class="asset-name">اتریوم</span>
+                    <span class="asset-symbol">ETH</span>
+                </div>
+            </div>
+            <div class="price-value" id="eth-price">در حال دریافت...</div>
+        </div>
 
-    <div id="score-board">SCORE: <span id="current-score">0</span></div>
-    <div id="tx-log">تاییدیه لود فریم...</div>
+        <div class="price-card">
+            <div class="asset-info">
+                <span class="asset-icon">👑</span>
+                <div>
+                    <span class="asset-name">اونس طلا</span>
+                    <span class="asset-symbol">XAU</span>
+                </div>
+            </div>
+            <div class="price-value" id="gold-price">در حال دریافت...</div>
+        </div>
+    </div>
+    
+    <div id="status-bar">به‌روزرسانی خودکار هر ۳۰ ثانیه</div>
 
     <script>
-        let provider, signer, userAddress, gameContract;
-        
-        // 🛑 آدرس قرارداد هوشمند خودت که روی Base Sepolia دیپلوی کردی رو اینجا بذار
-        const contractAddress = "0xaf8FB38EC9f8301a401B4f18bb3dEdb3F029E54c"; 
-        const contractABI = ["function recordJumps(uint256 _jumpCount) public"];
-
-        const connectBtn = document.getElementById("connect-btn");
-        const startBtn = document.getElementById("start-btn");
-        const instructionText = document.getElementById("instruction-text");
-        const gameContainer = document.getElementById("game-container");
-        const scoreBoard = document.getElementById("score-board");
-        const txLog = document.getElementById("tx-log");
-        const dino = document.getElementById("dino");
-        const cactus = document.getElementById("cactus");
-        const currentScoreIdx = document.getElementById("current-score");
-
-        let score = 0;
-        let isJumping = false;
-        let gameInterval;
-        let cactusPosition = 600;
-        let canScore = true;
-        let isGameRunning = false;
-
-        // مطلع کردن فارکستر از لود شدن فریم
+        // مطلع کردن فارکستر از لود شدن کامل مینی‌اپ
         window.addEventListener("DOMContentLoaded", async () => {
             if (window.farcaster && window.farcaster.FrameSDK) {
                 try {
                     await window.farcaster.FrameSDK.actions.ready();
-                    txLog.innerText = "فریم فارکستر با موفقیت آماده شد.";
-                } catch (e) {
-                    console.error("خطا در بهینه‌سازی SDK فارکستر:", e);
-                }
+                } catch (e) { console.error(e); }
             }
         });
 
-        // ۱. اتصال به کیف پول (سازگار با متامسک و ولت داخلی فارکستر)
-        connectBtn.addEventListener("click", async () => {
-            // استفاده از ولت فارکستر در صورت وجود، در غیر این صورت متامسک معمولی
-            const ethereumProvider = window.farcaster?.Provider || window.ethereum;
-
-            if (ethereumProvider) {
-                try {
-                    txLog.innerText = "در حال ارتباط با کیف پول...";
-                    provider = new ethers.BrowserProvider(ethereumProvider);
-                    await provider.send("eth_requestAccounts", []);
-                    signer = await provider.getSigner();
-                    userAddress = await signer.getAddress();
-                    gameContract = new ethers.Contract(contractAddress, contractABI, signer);
-                    
-                    document.getElementById("wallet-address").innerText = `ولت متصل: ${userAddress.substring(0,6)}...${userAddress.substring(38)}`;
-                    
-                    connectBtn.style.display = "none";
-                    startBtn.style.display = "inline-block";
-                    instructionText.innerText = "کیف پول متصل شد! هر زمان آماده بودید دکمه شروع را بزنید.";
-                    txLog.innerText = "آماده برای بازی.";
-                } catch (err) {
-                    console.error(err);
-                    txLog.innerText = "❌ خطا در اتصال به کیف پول.";
-                }
-            } else {
-                alert("کیف پولی یافت نشد. لطفاً این فریم را داخل Warpcast باز کنید.");
-            }
-        });
-
-        // ۲. دکمه شروع بازی
-        startBtn.addEventListener("click", () => {
-            document.getElementById("status-box").style.display = "none";
-            gameContainer.style.display = "block";
-            scoreBoard.style.display = "block";
-            txLog.innerText = "بازی شروع شد! روی باکس بازی ضربه بزنید یا Space بزنید تا بپرید.";
-            isGameRunning = true;
-            startGame();
-        });
-
-        // دکمه کیبورد برای دسکتاپ
-        document.addEventListener("keydown", function(event) {
-            if (event.code === "Space") {
-                triggerJump();
-            }
-        });
-
-        // تابع مدیریت پرش (هم لمسی هم کیبورد)
-        function triggerJump() {
-            if (!isJumping && isGameRunning) {
-                isJumping = true;
-                dino.classList.add("jump");
-                setTimeout(() => {
-                    dino.classList.remove("jump");
-                    isJumping = false;
-                }, 600);
-            }
-        }
-
-        // موتور اصلی حرکت دایناسور
-        function startGame() {
-            score = 0;
-            currentScoreIdx.innerText = score;
-            cactusPosition = 600;
-            canScore = true;
-            
-            clearInterval(gameInterval);
-            
-            gameInterval = setInterval(() => {
-                cactusPosition -= 7; // سرعت حرکت مانع قرمز
-                
-                if (cactusPosition < -20) {
-                    cactusPosition = 600; 
-                    canScore = true; 
-                }
-                cactus.style.left = cactusPosition + "px";
-
-                // بررسی عبور موفقیت‌آمیز
-                if (cactusPosition < 40 && canScore) {
-                    let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
-                    if (dinoBottom > 40) { 
-                        score++;
-                        currentScoreIdx.innerText = score;
-                        canScore = false; 
-                        sendAutoTx(); // ارسال تراکنش اتوماتیک روی زنجیره Base
-                    }
-                }
-
-                // بررسی باختن (برخورد)
-                let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue("bottom"));
-                if (cactusPosition > 30 && cactusPosition < 60 && dinoBottom <= 35) {
-                    txLog.innerText = "💥 بازی تمام شد! برای شروع دوباره، فریم را ببندید و دوباره باز کنید یا کست را رفرش کنید.";
-                    isGameRunning = false;
-                    clearInterval(gameInterval);
-                }
-            }, 20);
-        }
-
-        // ارسال تراکنش خودکار روی شبکه Base
-        async function sendAutoTx() {
+        // دریافت قیمت‌ها از APIهای رایگان و بدون تحریم
+        async function fetchPrices() {
             try {
-                txLog.innerText = `⏳ پرش موفق! درخواست تراکنش پرش شماره ${score} به ولت فرستاده شد...`;
-                const tx = await gameContract.recordJumps(1);
-                txLog.innerText = `🔗 تراکنش ${score} ارسال شد. در حال انتظار برای تایید بلاکچین Base...`;
+                // ۱. دریافت قیمت کریپتو از کوین‌جکو
+                const cryptoRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin&vs_currencies=usd');
+                const cryptoData = await cryptoRes.json();
                 
-                tx.wait().then(() => {
-                    txLog.innerText = `✅ پرش ${score} با موفقیت روی زنجیره Base ثبت شد!`;
-                });
+                document.getElementById('btc-price').innerText = `$${cryptoData.bitcoin.usd.toLocaleString()}`;
+                document.getElementById('eth-price').innerText = `$${cryptoData.ethereum.usd.toLocaleString()}`;
+
+                // ۲. دریافت قیمت طلا از منبع کمکی بدون تحریم
+                const goldRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd');
+                const goldData = await goldRes.json();
+                
+                if (goldData && goldData['pax-gold']) {
+                    // پکس‌گلد توکن دیجیتالی با پشتوانه دقیقاً ۱ اونس طلا است و دقیق‌ترین قیمت اونس را می‌دهد
+                    document.getElementById('gold-price').innerText = `$${goldData['pax-gold'].usd.toLocaleString()}`;
+                } else {
+                    document.getElementById('gold-price').innerText = `$2,350`;
+                }
+
             } catch (error) {
-                txLog.innerText = "❌ تراکنش توسط کاربر رد شد یا مشکلی در شبکه لایه ۲ پیش آمد.";
+                console.error("Error fetching prices:", error);
             }
         }
+
+        // اجرای اولیه و تنظیم تایمر ۳۰ ثانیه‌ای
+        fetchPrices();
+        setInterval(fetchPrices, 30000);
     </script>
 </body>
 </html>
