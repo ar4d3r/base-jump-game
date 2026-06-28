@@ -20,13 +20,12 @@
         }
         
         h2 {
-            font-size: 20px;
+            font-size: 18px;
             margin-bottom: 25px;
             color: #a5a6f6;
             letter-spacing: 0.5px;
         }
 
-        /* استایل کارت‌های قیمت */
         .crypto-container {
             max-width: 450px;
             margin: 0 auto;
@@ -42,40 +41,43 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            transition: transform 0.2s;
         }
 
         .asset-info {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 16px;
-            font-weight: bold;
         }
 
         .asset-icon {
             font-size: 24px;
         }
 
+        /* کوچک‌تر کردن نوشته‌های فارسی */
         .asset-name {
             color: #fff;
+            font-size: 13px; 
+            font-weight: normal;
         }
 
         .asset-symbol {
             color: #626484;
-            font-size: 12px;
+            font-size: 11px;
             margin-right: 5px;
+            display: block;
+            text-align: right;
+            margin-top: 2px;
         }
 
         .price-value {
-            font-size: 18px;
+            font-size: 19px;
             font-weight: 700;
             color: #00ffcc;
             font-family: monospace;
         }
 
         #status-bar {
-            font-size: 11px;
+            font-size: 10px;
             color: #525474;
             margin-top: 25px;
         }
@@ -94,7 +96,7 @@
                     <span class="asset-symbol">BTC</span>
                 </div>
             </div>
-            <div class="price-value" id="btc-price">در حال دریافت...</div>
+            <div class="price-value" id="btc-price">0.00</div>
         </div>
 
         <div class="price-card">
@@ -105,7 +107,7 @@
                     <span class="asset-symbol">ETH</span>
                 </div>
             </div>
-            <div class="price-value" id="eth-price">در حال دریافت...</div>
+            <div class="price-value" id="eth-price">0.00</div>
         </div>
 
         <div class="price-card">
@@ -116,51 +118,40 @@
                     <span class="asset-symbol">XAU</span>
                 </div>
             </div>
-            <div class="price-value" id="gold-price">در حال دریافت...</div>
+            <div class="price-value" id="gold-price">0.00</div>
         </div>
     </div>
     
-    <div id="status-bar">به‌روزرسانی خودکار هر ۳۰ ثانیه</div>
+    <div id="status-bar">به‌روزرسانی خودکار هر ثانیه</div>
 
     <script>
-        // مطلع کردن فارکستر از لود شدن کامل مینی‌اپ
         window.addEventListener("DOMContentLoaded", async () => {
             if (window.farcaster && window.farcaster.FrameSDK) {
-                try {
-                    await window.farcaster.FrameSDK.actions.ready();
-                } catch (e) { console.error(e); }
+                try { await window.farcaster.FrameSDK.actions.ready(); } catch (e) { console.error(e); }
             }
         });
 
-        // دریافت قیمت‌ها از APIهای رایگان و بدون تحریم
+        // اضافه کردن دو رقم اعشار دقیق (.toFixed(2))
+        function formatPrice(value) {
+            return parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
         async function fetchPrices() {
             try {
-                // ۱. دریافت قیمت کریپتو از کوین‌جکو
-                const cryptoRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin&vs_currencies=usd');
-                const cryptoData = await cryptoRes.json();
+                // استفاده از API با آپدیت فرکانس بالا
+                const cryptoRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin,pax-gold&vs_currencies=usd');
+                const data = await cryptoRes.json();
                 
-                document.getElementById('btc-price').innerText = `$${cryptoData.bitcoin.usd.toLocaleString()}`;
-                document.getElementById('eth-price').innerText = `$${cryptoData.ethereum.usd.toLocaleString()}`;
-
-                // ۲. دریافت قیمت طلا از منبع کمکی بدون تحریم
-                const goldRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd');
-                const goldData = await goldRes.json();
-                
-                if (goldData && goldData['pax-gold']) {
-                    // پکس‌گلد توکن دیجیتالی با پشتوانه دقیقاً ۱ اونس طلا است و دقیق‌ترین قیمت اونس را می‌دهد
-                    document.getElementById('gold-price').innerText = `$${goldData['pax-gold'].usd.toLocaleString()}`;
-                } else {
-                    document.getElementById('gold-price').innerText = `$2,350`;
+                if(data) {
+                    document.getElementById('btc-price').innerText = `$${formatPrice(data.bitcoin.usd)}`;
+                    document.getElementById('eth-price').innerText = `$${formatPrice(data.ethereum.usd)}`;
+                    document.getElementById('gold-price').innerText = `$${formatPrice(data['pax-gold'].usd)}`;
                 }
-
             } catch (error) {
                 console.error("Error fetching prices:", error);
             }
         }
 
-        // اجرای اولیه و تنظیم تایمر ۳۰ ثانیه‌ای
+        // اجرای اولیه و تنظیم تایمر روی ۱۰۰۰ میلی‌ثانیه (هر ثانیه)
         fetchPrices();
-        setInterval(fetchPrices, 30000);
-    </script>
-</body>
-</html>
+        setInterval(fetchPrices, 1000);
