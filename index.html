@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto & Gas Tracker</title>
+    <title>Crypto Prices & Live Tx Fees</title>
     
-    <meta property="fc:frame" content='{"version": "next", "imageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", "button": {"title": "View Live Dashboard", "action": {"type": "launch_ctx"}}}' />
+    <meta property="fc:frame" content='{"version": "next", "imageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", "button": {"title": "View Live Fees", "action": {"type": "launch_ctx"}}}' />
 
     <script src="https://unpkg.com/@farcaster/frame-sdk/dist/index.js"></script>
     
@@ -15,15 +15,16 @@
             text-align: center;
             background-color: #0d0e12;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             color: #fff;
         }
         
         h2 {
-            font-size: 18px;
-            margin-bottom: 25px;
+            font-size: 16px;
+            margin-bottom: 20px;
             color: #a5a6f6;
             letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
         .crypto-container {
@@ -35,8 +36,8 @@
             background: linear-gradient(135deg, #1e1f29 0%, #14151d 100%);
             border: 1px solid #2a2b3d;
             border-radius: 12px;
-            padding: 16px 20px;
-            margin-bottom: 15px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -50,7 +51,7 @@
         }
 
         .asset-icon {
-            font-size: 24px;
+            font-size: 22px;
         }
 
         .asset-name {
@@ -58,6 +59,7 @@
             font-size: 14px; 
             font-weight: 600;
             text-align: left;
+            display: block;
         }
 
         .asset-symbol {
@@ -69,31 +71,65 @@
         }
 
         .price-value {
-            font-size: 19px;
+            font-size: 18px;
             font-weight: 700;
             color: #00ffcc;
             font-family: monospace;
             text-align: right;
         }
 
-        .gas-value {
-            font-size: 12px;
+        /* بخش استایل تخمین هزینه‌های دلاری تراکنش‌ها */
+        .fee-panel {
+            background-color: #14151d;
+            border: 1px dashed #3a3b5c;
+            border-radius: 12px;
+            max-width: 450px;
+            margin: 15px auto 0 auto;
+            padding: 15px;
+            text-align: left;
+        }
+
+        .fee-title {
+            font-size: 13px;
             color: #ffb703;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .fee-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid #1e1f29;
+        }
+
+        .fee-row:last-child {
+            border-bottom: none;
+        }
+
+        .fee-label {
+            color: #adb5bd;
+        }
+
+        .fee-cost {
             font-family: monospace;
-            display: block;
-            margin-top: 3px;
+            color: #ff4a4a;
+            font-weight: bold;
         }
 
         #status-bar {
-            font-size: 10px;
+            font-size: 9px;
             color: #525474;
-            margin-top: 25px;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
 
-    <h2>📊 LIVE CRYPTO & GAS TRACKER</h2>
+    <h2>📊 LIVE PRICES & ETH TRANSACTION FEES</h2>
     
     <div class="crypto-container">
         <div class="price-card">
@@ -104,10 +140,7 @@
                     <span class="asset-symbol">BTC / USDT</span>
                 </div>
             </div>
-            <div>
-                <div class="price-value" id="btc-price">Loading...</div>
-                <div class="gas-value" id="btc-gas">Fee: Loading...</div>
-            </div>
+            <div class="price-value" id="btc-price">Loading...</div>
         </div>
 
         <div class="price-card">
@@ -118,17 +151,32 @@
                     <span class="asset-symbol">ETH / USDT</span>
                 </div>
             </div>
-            <div>
-                <div class="price-value" id="eth-price">Loading...</div>
-                <div class="gas-value" id="eth-gas">Gas: Loading...</div>
-            </div>
+            <div class="price-value" id="eth-price">Loading...</div>
+        </div>
+    </div>
+
+    <div class="fee-panel">
+        <div class="fee-title" id="live-gwei">ETH Base Gas: Loading...</div>
+        
+        <div class="fee-row">
+            <span class="fee-label">ETH Transfer (Low Gas)</span>
+            <span class="fee-cost" id="cost-transfer">Calculating...</span>
+        </div>
+        <div class="fee-row">
+            <span class="fee-label">ERC20 Token Transfer</span>
+            <span class="fee-cost" id="cost-erc20">Calculating...</span>
+        </div>
+        <div class="fee-row">
+            <span class="fee-label">Uniswap V3 Swap</span>
+            <span class="fee-cost" id="cost-uniswap">Calculating...</span>
         </div>
     </div>
     
-    <div id="status-bar">Real-time updates active</div>
+    <div id="status-bar">Updates every second • Fees calculated in USD</div>
 
     <script>
-        // Initialize Farcaster Frame SDK
+        let currentEthPrice = 0;
+
         window.addEventListener("DOMContentLoaded", async () => {
             if (window.farcaster && window.farcaster.FrameSDK) {
                 try { await window.farcaster.FrameSDK.actions.ready(); } catch (e) { console.error(e); }
@@ -139,7 +187,7 @@
             return parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        // Fetch Live Prices from Binance Public API
+        // دریافت قیمت لحظه‌ای از بایننس
         async function fetchLivePrices() {
             try {
                 const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=["BTCUSDT","ETHUSDT"]');
@@ -150,54 +198,67 @@
                     const ethData = data.find(item => item.symbol === "ETHUSDT");
                     
                     if(btcData) document.getElementById('btc-price').innerText = `$${formatPrice(btcData.price)}`;
-                    if(ethData) document.getElementById('eth-price').innerText = `$${formatPrice(ethData.price)}`;
+                    if(ethData) {
+                        currentEthPrice = parseFloat(ethData.price);
+                        document.getElementById('eth-price').innerText = `$${formatPrice(ethData.price)}`;
+                    }
                 }
             } catch (error) {
                 console.error("Price API Error:", error);
             }
         }
 
-        // Fetch Live Gas and Tx Fees
-        async function fetchGasFees() {
+        // فچ کردن گس و محاسبه دلاری تراکنش‌ها بر اساس محدودیت‌های گس اتراسکن
+        async function calculateTransactionCosts() {
             try {
-                // Fetch Ethereum Gas via OWLRACLE Public API
-                const ethGasRes = await fetch('https://api.owlracle.info/v4/eth/gas?apikey=7dbfa79f64924c55a297924d5ba7b503');
-                const ethGasData = await ethGasRes.json();
-                if (ethGasData && ethGasData.speeds) {
-                    const normalGas = ethGasData.speeds[1].gasPrice;
-                    document.getElementById('eth-gas').innerText = `Gas: ${Math.round(normalGas)} Gwei`;
-                } else {
-                    document.getElementById('eth-gas').innerText = `Gas: ~24 Gwei`;
-                }
+                const response = await fetch('https://api.owlracle.info/v4/eth/gas?apikey=7dbfa79f64924c55a297924d5ba7b503');
+                const data = await response.json();
+                
+                if (data && data.speeds && currentEthPrice > 0) {
+                    // دریافت گس فی در وضعیت نرمال (Gwei)
+                    const gwei = data.speeds[1].gasPrice;
+                    document.getElementById('live-gwei').innerText = `ETH Base Gas: ${Math.round(gwei)} Gwei`;
 
-                // Fetch Bitcoin Fee Estimate via Mempool Space Public API
-                const btcFeeRes = await fetch('https://mempool.space/api/v1/fees/recommended');
-                const btcFeeData = await btcFeeRes.json();
-                if (btcFeeData && btcFeeData.halfHourFee) {
-                    document.getElementById('btc-gas').innerText = `Fee: ${btcFeeData.halfHourFee} sat/vB`;
-                } else {
-                    document.getElementById('btc-gas').innerText = `Fee: ~18 sat/vB`;
+                    // مقادیر استاندارد Gas Limit تراکنش‌ها در شبکه اتریوم (دقیقاً مشابه الگوریتم اتراسکن)
+                    const ethTransferGasLimit = 21000;
+                    const erc20TransferGasLimit = 65000;
+                    const uniswapSwapGasLimit = 130000;
+
+                    // فرمول محاسبه هزینه دلاری: (Gas Limit * Gwei * 10^-9) * ETH Price
+                    const transferCost = (ethTransferGasLimit * gwei * 0.000000001) * currentEthPrice;
+                    const erc20Cost = (erc20TransferGasLimit * gwei * 0.000000001) * currentEthPrice;
+                    const uniswapCost = (uniswapSwapGasLimit * gwei * 0.000000001) * currentEthPrice;
+
+                    // نمایش در خروجی مینی‌اپ
+                    document.getElementById('cost-transfer').innerText = `$${transferCost.toFixed(2)}`;
+                    document.getElementById('cost-erc20').innerText = `$${erc20Cost.toFixed(2)}`;
+                    document.getElementById('cost-uniswap').innerText = `$${uniswapCost.toFixed(2)}`;
                 }
             } catch (error) {
-                // Fallbacks if rate limit occurs
-                if(document.getElementById('eth-gas').innerText.includes("Loading")) {
-                    document.getElementById('eth-gas').innerText = `Gas: ~21 Gwei`;
-                }
-                if(document.getElementById('btc-gas').innerText.includes("Loading")) {
-                    document.getElementById('btc-gas').innerText = `Fee: ~25 sat/vB`;
+                console.error("Gas API Error:", error);
+                // مقادیر تخمینی در صورت اختلال موقت سرور گس
+                if (currentEthPrice > 0) {
+                    document.getElementById('live-gwei').innerText = `ETH Base Gas: ~18 Gwei`;
+                    document.getElementById('cost-transfer').innerText = `$${((21000 * 18 * 0.000000001) * currentEthPrice).toFixed(2)}`;
+                    document.getElementById('cost-erc20').innerText = `$${((65000 * 18 * 0.000000001) * currentEthPrice).toFixed(2)}`;
+                    document.getElementById('cost-uniswap').innerText = `$${((130000 * 18 * 0.000000001) * currentEthPrice).toFixed(2)}`;
                 }
             }
         }
 
-        // Initial Executions
-        fetchLivePrices();
-        fetchGasFees();
+        // لود اولیه کدهای برنامه
+        async function init() {
+            await fetchLivePrices(); // اول دریافت قیمت اتریوم برای فرمول ریاضی
+            calculateTransactionCosts();
+        }
 
-        // High frequency ticker (every 1 second)
+        init();
+
+        // به‌روزرسانی ثانیه‌ای قیمت کریپتو
         setInterval(fetchLivePrices, 1000);
         
-        // Moderate frequency ticker for network gas (every 8 seconds)
-        setInterval(fetchGasFees, 8000);
+        // به‌روزرسانی هزینه‌های گس و محاسبات دلاری هر ۶ ثانیه یک‌بار
+        setInterval(calculateTransactionCosts, 6000);
     </script>
 </body>
 </html>
