@@ -53,7 +53,6 @@
             font-size: 24px;
         }
 
-        /* کوچک‌تر کردن نوشته‌های فارسی */
         .asset-name {
             color: #fff;
             font-size: 13px; 
@@ -96,7 +95,7 @@
                     <span class="asset-symbol">BTC</span>
                 </div>
             </div>
-            <div class="price-value" id="btc-price">0.00</div>
+            <div class="price-value" id="btc-price">درحال دریافت...</div>
         </div>
 
         <div class="price-card">
@@ -107,7 +106,7 @@
                     <span class="asset-symbol">ETH</span>
                 </div>
             </div>
-            <div class="price-value" id="eth-price">0.00</div>
+            <div class="price-value" id="eth-price">درحال دریافت...</div>
         </div>
 
         <div class="price-card">
@@ -118,11 +117,11 @@
                     <span class="asset-symbol">XAU</span>
                 </div>
             </div>
-            <div class="price-value" id="gold-price">0.00</div>
+            <div class="price-value" id="gold-price">درحال دریافت...</div>
         </div>
     </div>
     
-    <div id="status-bar">به‌روزرسانی خودکار هر ثانیه</div>
+    <div id="status-bar">به‌روزرسانی خودکار و بدون وقفه</div>
 
     <script>
         window.addEventListener("DOMContentLoaded", async () => {
@@ -131,27 +130,50 @@
             }
         });
 
-        // اضافه کردن دو رقم اعشار دقیق (.toFixed(2))
         function formatPrice(value) {
             return parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        async function fetchPrices() {
+        // استفاده از API عمومی و فوق‌العاده سریع بایننس برای کریپتو
+        async function fetchCryptoPrices() {
             try {
-                // استفاده از API با آپدیت فرکانس بالا
-                const cryptoRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin,pax-gold&vs_currencies=usd');
-                const data = await cryptoRes.json();
+                const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=["BTCUSDT","ETHUSDT"]');
+                const data = await response.json();
                 
-                if(data) {
-                    document.getElementById('btc-price').innerText = `$${formatPrice(data.bitcoin.usd)}`;
-                    document.getElementById('eth-price').innerText = `$${formatPrice(data.ethereum.usd)}`;
-                    document.getElementById('gold-price').innerText = `$${formatPrice(data['pax-gold'].usd)}`;
+                if (Array.isArray(data)) {
+                    const btcData = data.find(item => item.symbol === "BTCUSDT");
+                    const ethData = data.find(item => item.symbol === "ETHUSDT");
+                    
+                    if(btcData) document.getElementById('btc-price').innerText = `$${formatPrice(btcData.price)}`;
+                    if(ethData) document.getElementById('eth-price').innerText = `$${formatPrice(ethData.price)}`;
                 }
             } catch (error) {
-                console.error("Error fetching prices:", error);
+                console.error("Crypto API Error:", error);
             }
         }
 
-        // اجرای اولیه و تنظیم تایمر روی ۱۰۰۰ میلی‌ثانیه (هر ثانیه)
-        fetchPrices();
-        setInterval(fetchPrices, 1000);
+        // استفاده از یک API جایگزین پایدار و بدون تحریم برای طلا
+        async function fetchGoldPrice() {
+            try {
+                const response = await fetch('https://api.gold-api.com/proxy/static');
+                const data = await response.json();
+                if (data && data.price) {
+                    document.getElementById('gold-price').innerText = `$${formatPrice(data.price)}`;
+                }
+            } catch (error) {
+                console.error("Gold API Error:", error);
+            }
+        }
+
+        // اجرای اولیه توابع
+        fetchCryptoPrices();
+        fetchGoldPrice();
+
+        // آپدیت ثانیه‌ای برای کریپتو (بایننس لیمیت ندارد)
+        setInterval(fetchCryptoPrices, 1000);
+        
+        // آپدیت طلا هر ۵ ثانیه یک‌بار (چون طلا نوسانات ثانیه‌ای شدیدی مثل کریپتو ندارد و سرور قفل نمی‌کند)
+        setInterval(fetchGoldPrice, 5000);
+    </script>
+</body>
+</html>
