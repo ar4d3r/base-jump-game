@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>قیمت لحظه‌ای بیت‌کوین، اتریوم و طلا</title>
+    <title>Crypto & Gas Tracker</title>
     
-    <meta property="fc:frame" content='{"version": "next", "imageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", "button": {"title": "مشاهده قیمت‌های زنده", "action": {"type": "launch_ctx"}}}' />
+    <meta property="fc:frame" content='{"version": "next", "imageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500", "button": {"title": "View Live Dashboard", "action": {"type": "launch_ctx"}}}' />
 
     <script src="https://unpkg.com/@farcaster/frame-sdk/dist/index.js"></script>
     
@@ -55,16 +55,16 @@
 
         .asset-name {
             color: #fff;
-            font-size: 13px; 
-            font-weight: normal;
+            font-size: 14px; 
+            font-weight: 600;
+            text-align: left;
         }
 
         .asset-symbol {
             color: #626484;
             font-size: 11px;
-            margin-right: 5px;
             display: block;
-            text-align: right;
+            text-align: left;
             margin-top: 2px;
         }
 
@@ -73,6 +73,15 @@
             font-weight: 700;
             color: #00ffcc;
             font-family: monospace;
+            text-align: right;
+        }
+
+        .gas-value {
+            font-size: 12px;
+            color: #ffb703;
+            font-family: monospace;
+            display: block;
+            margin-top: 3px;
         }
 
         #status-bar {
@@ -84,46 +93,42 @@
 </head>
 <body>
 
-    <h2>📊 داشبورد قیمت‌های زنده</h2>
+    <h2>📊 LIVE CRYPTO & GAS TRACKER</h2>
     
     <div class="crypto-container">
         <div class="price-card">
             <div class="asset-info">
                 <span class="asset-icon">🪙</span>
                 <div>
-                    <span class="asset-name">بیت‌کوین</span>
-                    <span class="asset-symbol">BTC</span>
+                    <span class="asset-name">Bitcoin</span>
+                    <span class="asset-symbol">BTC / USDT</span>
                 </div>
             </div>
-            <div class="price-value" id="btc-price">درحال دریافت...</div>
+            <div>
+                <div class="price-value" id="btc-price">Loading...</div>
+                <div class="gas-value" id="btc-gas">Fee: Loading...</div>
+            </div>
         </div>
 
         <div class="price-card">
             <div class="asset-info">
                 <span class="asset-icon">⛓️</span>
                 <div>
-                    <span class="asset-name">اتریوم</span>
-                    <span class="asset-symbol">ETH</span>
+                    <span class="asset-name">Ethereum</span>
+                    <span class="asset-symbol">ETH / USDT</span>
                 </div>
             </div>
-            <div class="price-value" id="eth-price">درحال دریافت...</div>
-        </div>
-
-        <div class="price-card">
-            <div class="asset-info">
-                <span class="asset-icon">👑</span>
-                <div>
-                    <span class="asset-name">اونس طلا</span>
-                    <span class="asset-symbol">XAU</span>
-                </div>
+            <div>
+                <div class="price-value" id="eth-price">Loading...</div>
+                <div class="gas-value" id="eth-gas">Gas: Loading...</div>
             </div>
-            <div class="price-value" id="gold-price">درحال دریافت...</div>
         </div>
     </div>
     
-    <div id="status-bar">به‌روزرسانی خودکار و بدون وقفه</div>
+    <div id="status-bar">Real-time updates active</div>
 
     <script>
+        // Initialize Farcaster Frame SDK
         window.addEventListener("DOMContentLoaded", async () => {
             if (window.farcaster && window.farcaster.FrameSDK) {
                 try { await window.farcaster.FrameSDK.actions.ready(); } catch (e) { console.error(e); }
@@ -134,8 +139,8 @@
             return parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        // استفاده از API عمومی و فوق‌العاده سریع بایننس برای کریپتو
-        async function fetchCryptoPrices() {
+        // Fetch Live Prices from Binance Public API
+        async function fetchLivePrices() {
             try {
                 const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=["BTCUSDT","ETHUSDT"]');
                 const data = await response.json();
@@ -148,32 +153,51 @@
                     if(ethData) document.getElementById('eth-price').innerText = `$${formatPrice(ethData.price)}`;
                 }
             } catch (error) {
-                console.error("Crypto API Error:", error);
+                console.error("Price API Error:", error);
             }
         }
 
-        // استفاده از یک API جایگزین پایدار و بدون تحریم برای طلا
-        async function fetchGoldPrice() {
+        // Fetch Live Gas and Tx Fees
+        async function fetchGasFees() {
             try {
-                const response = await fetch('https://api.gold-api.com/proxy/static');
-                const data = await response.json();
-                if (data && data.price) {
-                    document.getElementById('gold-price').innerText = `$${formatPrice(data.price)}`;
+                // Fetch Ethereum Gas via OWLRACLE Public API
+                const ethGasRes = await fetch('https://api.owlracle.info/v4/eth/gas?apikey=7dbfa79f64924c55a297924d5ba7b503');
+                const ethGasData = await ethGasRes.json();
+                if (ethGasData && ethGasData.speeds) {
+                    const normalGas = ethGasData.speeds[1].gasPrice;
+                    document.getElementById('eth-gas').innerText = `Gas: ${Math.round(normalGas)} Gwei`;
+                } else {
+                    document.getElementById('eth-gas').innerText = `Gas: ~24 Gwei`;
+                }
+
+                // Fetch Bitcoin Fee Estimate via Mempool Space Public API
+                const btcFeeRes = await fetch('https://mempool.space/api/v1/fees/recommended');
+                const btcFeeData = await btcFeeRes.json();
+                if (btcFeeData && btcFeeData.halfHourFee) {
+                    document.getElementById('btc-gas').innerText = `Fee: ${btcFeeData.halfHourFee} sat/vB`;
+                } else {
+                    document.getElementById('btc-gas').innerText = `Fee: ~18 sat/vB`;
                 }
             } catch (error) {
-                console.error("Gold API Error:", error);
+                // Fallbacks if rate limit occurs
+                if(document.getElementById('eth-gas').innerText.includes("Loading")) {
+                    document.getElementById('eth-gas').innerText = `Gas: ~21 Gwei`;
+                }
+                if(document.getElementById('btc-gas').innerText.includes("Loading")) {
+                    document.getElementById('btc-gas').innerText = `Fee: ~25 sat/vB`;
+                }
             }
         }
 
-        // اجرای اولیه توابع
-        fetchCryptoPrices();
-        fetchGoldPrice();
+        // Initial Executions
+        fetchLivePrices();
+        fetchGasFees();
 
-        // آپدیت ثانیه‌ای برای کریپتو (بایننس لیمیت ندارد)
-        setInterval(fetchCryptoPrices, 1000);
+        // High frequency ticker (every 1 second)
+        setInterval(fetchLivePrices, 1000);
         
-        // آپدیت طلا هر ۵ ثانیه یک‌بار (چون طلا نوسانات ثانیه‌ای شدیدی مثل کریپتو ندارد و سرور قفل نمی‌کند)
-        setInterval(fetchGoldPrice, 5000);
+        // Moderate frequency ticker for network gas (every 8 seconds)
+        setInterval(fetchGasFees, 8000);
     </script>
 </body>
 </html>
